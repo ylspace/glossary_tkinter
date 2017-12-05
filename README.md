@@ -8,5 +8,6 @@
 #### 支持自定义单词分类
 #### 支持自定义词义高亮显示
 ##### 更新中...
+
 ![运行示例](https://github.com/ylspace/glossary_tkinter/master/screenshot/1.jpg)
 ```哈哈哈```
