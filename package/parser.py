@@ -3,8 +3,10 @@
 from bs4 import BeautifulSoup, SoupStrainer
 
 
-# 内容解析器
 class Parser:
+    """
+    从指定页面解析特定文本元素
+    """
     def __init__(self, page):
         only_div_tags = SoupStrainer("div")  # 只解析div标签
         self._soup = BeautifulSoup(page, 'lxml', parse_only=only_div_tags)  # 创建BeautifulSoup对象

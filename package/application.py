@@ -430,6 +430,13 @@ class DictWin(Toplevel):
         self.frm_btns = Frame(self, width=800, height=50)
         self.frm_btns.pack(side=TOP, fill=X)
 
+        self.btn_delete = Button(self.frm_btns, text='移除', command=lambda: self.parent.dict_handle("remove"))
+        self.btn_delete.pack(side=LEFT)
+        self.btn_specify = Button(self.frm_btns, text='指定', command=lambda: self.parent.dict_handle("specify"))
+        self.btn_specify.pack(side=LEFT)
+        self.btn_classify = Button(self.frm_btns, text='分类', command=lambda: self.parent.dict_handle("classify"))
+        self.btn_classify.pack(side=LEFT)
+
         self.frm_tree = Frame(self)
         self.frm_tree.pack(side=TOP, fill=BOTH, expand=1)
         # columns为第2列之后列

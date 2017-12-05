@@ -9,8 +9,7 @@ import _tkinter
 from xlwt import *
 from xlrd import *
 from collections import OrderedDict
-from tkinter import messagebox, filedialog
-from tkinter import *
+from tkinter import messagebox, filedialog, END
 from package import utils, application
 
 sys.setrecursionlimit(10000)  # 设置较大递归深度, 防止对象组合使用时, 调用方法出错
@@ -382,7 +381,7 @@ class DataBase(MasterDB):  # 数据库
                 for index, item in enumerate(group):
                     ws.write(index, 0, item[0])
                     # item[1]为字符串形式的列表, 通过misc简化得列表, 只能以字符串形式写入xls
-                    ws.write(index, 1, str(utils.get_mean_items(eval(item[1]))))
+                    ws.write(index, 1, str(utils.get_mean_items(ast.literal_eval(item[1]))))
                 wb.save(f_export.name)
             f_export.close()
 

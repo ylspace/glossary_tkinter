@@ -2,11 +2,9 @@
 
 from package import application, crawler, database, proxy, translate
 import time
-import os
 import sys
 import requests
 import random
-import atexit
 from PIL import Image, ImageTk
 from tkinter import Tk, Label, font, StringVar
 from threading import Thread
@@ -38,8 +36,11 @@ def startup(progress):
     num = len(data)
     if num >= 5:
         delay = 3 / num  # 总延迟时间4秒
+    _ = time.time()
     for item in data:  # 遍历字典, item为key
         time.sleep(delay)
+        if time.time() - _ >= 4.0:
+            break
         progress.set('启动中: 从数据库导入词条 ' + item)
         win_startup.update_idletasks()
 
