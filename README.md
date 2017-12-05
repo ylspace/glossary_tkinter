@@ -10,4 +10,3 @@
 ##### 更新中...
 
 ![运行示例](https://github.com/ylspace/glossary_tkinter/master/screenshot/1.jpg)
-```哈哈哈```
