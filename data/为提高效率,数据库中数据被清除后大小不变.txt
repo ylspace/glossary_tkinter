@@ -1,0 +1,3 @@
+原因是：
+sqlite采用的是变长纪录存储，当你从Sqlite删除数据后，未使用的磁盘空间被添加到一个内在的”空闲列表”中用于存储你下次插入的数据，用于提高效率，磁盘空间并没有丢失，但也不向操作系统返回磁盘空间，这就导致删除数据乃至清空整个数据库后，数据文件大小还是没有任何变化，还是很大
+Because SQLite just marks the deleted objects as free and reserves it for the future uses. As a result, the size of the database file always grows in size
