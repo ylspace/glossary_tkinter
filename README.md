@@ -10,3 +10,6 @@
 ##### 更新中...
 
 ![运行示例](https://raw.githubusercontent.com/ylspace/glossary_tkinter/master/screenshot/1.jpg)
+![](https://raw.githubusercontent.com/ylspace/glossary_tkinter/master/screenshot/2.jpg)
+![](https://raw.githubusercontent.com/ylspace/glossary_tkinter/master/screenshot/3.jpg)
+![](https://raw.githubusercontent.com/ylspace/glossary_tkinter/master/screenshot/4.jpg)
