@@ -11,4 +11,4 @@
 
 ----
 
-![image](http://github.com/ylspace/glossary_tkinter/blob/master/screenshot/1.jpg)
+![image](https://github.com/ylspace/glossary_tkinter/master/screenshot/1.jpg)
