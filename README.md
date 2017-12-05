@@ -12,3 +12,4 @@
 ----
 
 ![运行示例](https://raw.githubusercontent.com/ylspace/glossary_tkinter/master/screenshot/1.jpg)
+```哈哈哈```
