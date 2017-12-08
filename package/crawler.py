@@ -20,28 +20,42 @@ class Crawler:
         self.response = None
         self.url = "http://cn.bing.com/dict/search/"
         self.status_code = 200
+        self.called_count = 0
         self.header = {"User-Agent":
-                       "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)\
-                        Chrome/45.0.2454.101 Safari/537.36",
-                       "Accept - Language": "zh - CN, zh;q = 0.8",
-                       'Connection': "keep-alive",
-                       'Referer': "https://www.bing.com/",
-                       'Upgrade - Insecure - Requests': 1
+                       "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) \
+                       Chrome/55.0.2883.87 Safari/537.36",
+                       "Accept-Language": "zh - CN, zh;q = 0.8",
+                       # 'Connection': "keep-alive",
+                       # 'Referer': "https://www.bing.com/",
+                       # 'Upgrade-Insecure - Requests': 1
                        }
 
     def access(self, word, pass_connect_error):  # 访问和搜索
-        post = {'q': word, 'go': "搜索"}
+        post = {
+            'q': word,
+            'qs': 'n',
+            'form': 'Z9LH5',
+            'sp': -1,
+            'pq': word,
+        }
 
         content = ""
         proxy_list = proxy.get_proxy()
-        proxies = {'https': random.choice(proxy_list)} if proxy_list else None
+        proxies = {}
+        if proxy_list:
+            proxies_tuple = random.choice(proxy_list)
+            proxies[proxies_tuple[0]] = proxies_tuple[1]
         try:
-            self.response = requests.get(self.url, params=post, headers=header, proxies=proxies, timeout=6)
-        except requests.exceptions.ConnectionError:
+            self.response = requests.get(self.url, params=post, headers=self.header, proxies=proxies, timeout=8)
+            self.called_count += 1
+            print('第{}次成功GET'.format(self.called_count))
+        except requests.exceptions.ConnectionError as e:
+            print('网络连接出错', e)
             if not pass_connect_error:
                 messagebox.showerror(title="网络错误!", message="网络连接出错!")
         except requests.exceptions.ReadTimeout as timeout:
             msg = "访问地址超时!"
+            print(msg)
             match = re.search("host='.*?'", str(timeout))
             if match and match == "host='127.0.0.1'":
                 msg += "请检查代理设置!"
@@ -50,8 +64,12 @@ class Crawler:
         else:
             self.status_code = self.response.status_code
             content = self.response.text
-            if re.search("<div>No results found for ", content) and not pass_connect_error:
+            if not content:
+                print('成功获取到空页面')
+            # if re.search("<div>No results found for ", content) and not pass_connect_error:
+            if re.search("<div>No results found for ", content):
                 content = ""
-                messagebox.showerror(title="网络错误!", message="请检查网络代理设置!")
+                print('检查网络代理')
+                # messagebox.showerror(title="网络错误!", message="请检查网络代理设置!")
         finally:
             return content

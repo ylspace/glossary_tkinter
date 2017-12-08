@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
+"""
+杂项处理函数工具
+"""
+
 import re
 import os
 import datetime
 
-"""
-杂项处理函数与对象
-"""
 
 pattern_zh = "[\u4e00-\u9fa5]"  # 中文匹配模板
 pattern_ip = "(25[0-5]|2[0-4]\d|[0-1]\d{2}|[1-9]?\d)\.(25[0-5]|2[0-4]\d|[0-1]\d{2}|[1-9]?\d)\.\
@@ -82,25 +83,20 @@ def get_mean_items(group):
     return set(items)  # 去重
 
 
-# 获取文件上次修改的天数间隔
+# 获取文件上次修改的小时间隔
 def modified_days(file):
     mtime = datetime.datetime.fromtimestamp(os.path.getmtime(file))  # 上次修改/创建的时间
     now = datetime.datetime.now()  # 现在时间
-    days = (now - mtime).days
-    return days  # 返回修改时间天数
+    hours = (now - mtime).seconds / 3600
+    return round(hours)  # 返回修改小时数
 
 
 # 检验代理IP文件是否有效(存在有效内容且未过期)
 def is_valid_ipfile(file):
     if os.path.getsize(file) == 0:  # 空文件
         return False
-    is_recent_modified = modified_days(file) < 1
+    is_recent_modified = modified_days(file) < 3
     with open(file) as ip_file:
         is_ip_included = re.search(r"HTTP", ip_file.read())
 
     return is_ip_included and is_recent_modified
-
-
-# l = ['adj.习惯于；通常的；惯常的', 'v.“accustom”的过去分词和过去式', '网络: 习惯的；习惯了的；习惯于…的']
-# print(get_mean_items(l))
-

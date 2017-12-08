@@ -1,4 +1,4 @@
-import os
+import os.path
 import inspect
 import requests
 from bs4 import BeautifulSoup, SoupStrainer
@@ -16,7 +16,7 @@ proxy_list = []
 proxies_file = r"\data\proxy_list.txt"
 
 
-def search_proxy():
+def _search_proxy():
     for page in range(1, 9):  # 从前8页中提取
         req = requests.get(url + "/{}".format(page), headers=header)
         html = req.text
@@ -41,14 +41,14 @@ def get_proxy():
         else:
             proxy_file_path = os.path.dirname(caller_path) + proxies_file
 
-    if os.path.exists(proxy_file_path) and utils.is_valid_ipfile(proxy_file_path):  # 文件存在有效内容且上次更新时间小于一天
+    if os.path.exists(proxy_file_path) and utils.is_valid_ipfile(proxy_file_path):  # 文件存在有效内容且上次更新时间小于3小时
         with open(proxy_file_path, "r") as proxy_file:
             cur_proxy_list = eval(proxy_file.read())
 
     elif not os.path.exists(proxy_file_path) or not utils.is_valid_ipfile(proxy_file_path):  # 文件不存在 或无有效内容/过期
         with open(proxy_file_path, "w") as proxy_file:
             try:
-                search_proxy()
+                _search_proxy()
             except requests.exceptions.ConnectionError:
                 pass
             else:

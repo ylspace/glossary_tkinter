@@ -183,9 +183,9 @@ class DataBase(MasterDB):  # 数据库
         db_dict = sqlite3.connect('.\data\Dictionary.db')
         try:
             db_dict.execute("INSERT INTO DICT VALUES (?, ?, ?, ?)", (items[0], items[1], str(items[2]), str(items[3])))
-        except sqlite3.IntegrityError:  # 过去式与搜索结果不一致, 导致重复保存
+        except sqlite3.IntegrityError:  # 分词形式搜索时被还原为原型, 导致重复保存
             repeat_word += 1
-            print("过去式-重复保存!")
+            print("分词型式-重复保存! --", items[0])
         except TypeError:
             print("NoneType!")
         else:
@@ -343,7 +343,8 @@ class DataBase(MasterDB):  # 数据库
             if os.path.splitext(f_import.name)[1] == '.txt':  # 导入的文本文件
                 encoding = chardet.detect(f_import.read())['encoding']
                 f_import.seek(0, 0)  # 重置指针位置
-                items = [line.decode(encoding).split("|", 1)[0] for line in f_import.readlines()]  # 以"|"分隔
+                items = [line.decode(encoding).split("|", 1)[0]
+                         for line in f_import.readlines() if line]  # 忽略空行, 以"|"分隔
                 items = [word for word in items if not DataBase.is_exist_simple(self, word)]  # 确保未保存
                 if len(items) > 0:
                     if messagebox.askokcancel(title="导入词条", message="文件中共有{0}个未保存单词, 是否导入".format(len(items))):

@@ -79,7 +79,7 @@ def network_check(obj):
     while True:
         proxy_item = random.choice(proxy.get_proxy())
         proxies = {proxy_item[0]: proxy_item[1]}
-        time.sleep(0.6)
+        time.sleep(1)
         try:
             requests.get("http://cn.bing.com/dict/search/", headers=header, proxies=proxies)
             try:

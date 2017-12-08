@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import threading
-import multiprocessing
-import time
 import copy
 import queue
 from collections import deque
 from tkinter import *
-from tkinter import font, _tkinter
+from tkinter import font, _tkinter, messagebox, StringVar
 # 使用ttk的组件,除Scrollbar(不会在不需要时自动隐藏slider), Frame
 from tkinter.ttk import Button, Combobox, Entry, Label, Notebook, Radiobutton, Treeview, Progressbar
-from tkinter import messagebox
 from idlelib import ToolTip
+import weakref
+import time
 from package import widgets, parser, database, utils, proxy
 
 # 全局变量
@@ -29,6 +28,7 @@ class MainWin(Frame):  # 继承自Frame类
         self.root = master
         self.pack(expand=1, fill=BOTH)  # 初始化应用布局
         self.my_crawler = my_crawler
+        self.my_crawler_access = self.my_crawler.access  # 提前获取方法, 避免重复查找属性
 
         self.win_Pref = None      # 弹出的设置窗口
         self.win_Dict = None      # 弹出的字典窗口
@@ -245,7 +245,7 @@ class MainWin(Frame):  # 继承自Frame类
             self.lbl_existinfo['text'] = ""  # 重置信息标签, 不显示消息
             self.search_error = False  # 重置搜索情况, 未出错
             if not is_saved:  # 若数据库中不存在, 则执行网络搜索或显示区域返回(若一致)
-                page = self.my_crawler.access(entry, pass_connect_error=False)  # 访问并获取页面
+                page = self.my_crawler_access(entry, pass_connect_error=False)  # 访问并获取页面
                 if page:  # 检查是否获取到有效页面
                     my_parser = parser.Parser(page)  # 创建一个解析器, 并将页面传入解析器
                     word, id_1 = my_parser.get_word()  # 获取当前搜索的字词, 返回形式为网页中的
@@ -301,19 +301,25 @@ class MainWin(Frame):  # 继承自Frame类
             self.dic.is_displayed = False
 
     def search_simple(self, keyword):
-        page = self.my_crawler.access(keyword, pass_connect_error=True)  # 访问并获取页面
-        if page:  # 检查是否获取到有效页面
-            my_parser = parser.Parser(page)  # 创建一个解析器, 并将页面传入解析器
-            word, id_1 = my_parser.get_word()  # 获取当前搜索的字词, 返回形式为网页中的
+        if not hasattr(self, 'search_None_count'):
+            self.search_None_count = 0
+        # print('called search_simple')
+        for _ in range(2):  # 若访问失败再次尝试
+            page = self.my_crawler_access(keyword, pass_connect_error=True)  # 访问并获取页面
+            if page:  # 检查是否获取到有效页面
+                my_parser = parser.Parser(page)  # 创建一个解析器, 并将页面传入解析器
+                word, id_1 = my_parser.get_word()  # 获取当前搜索的字词, 返回形式为网页中的
 
-            pronunciation, id_2 = my_parser.get_pronunciation()  # 获取当前单词的音标
-            meanings, id_3 = my_parser.get_meanings()  # 获取当前单词的释义
-            egSentence, id_4 = my_parser.get_egsentence()  # 获取当前单词的例句
-            items = (word, pronunciation, meanings, egSentence)
-            result = copy.deepcopy(items)  # 结果副本
-            return result
-        else:
-            return None
+                pronunciation, id_2 = my_parser.get_pronunciation()  # 获取当前单词的音标
+                meanings, id_3 = my_parser.get_meanings()  # 获取当前单词的释义
+                egSentence, id_4 = my_parser.get_egsentence()  # 获取当前单词的例句
+                items = (word, pronunciation, meanings, egSentence)
+                result = copy.deepcopy(items)  # 结果副本
+                return result
+
+        self.search_None_count += 1
+        print('第{}次返回None结果'.format(self.search_None_count))
+        return None
 
     def get_text_display(self, item_id):  # 获取文本区域的显示
         if item_id == 1:
@@ -697,22 +703,29 @@ class ImportWin(Toplevel):
     def __init__(self, parent, lines, file):
         Toplevel.__init__(self, parent)
         self.parent = parent
-        self.lines = lines
         self.count = len(lines)
+        self.lines = deque(lines)
         self.value = 0  # 进度条的值
         self.repeats = 0  # 因过去式等形式而重复保存单词的次数
-        self.queue_size = 50
-        self.q = queue.Queue(maxsize=self.queue_size)
+        self.queue_size = self.count
+        self.q = queue.Queue()
         self.failed_words = []
         self.to_stop = False
-        self.lock = threading.Lock()
-        self.run_list = []
         self.title("正在从 [{0}] 导入词条".format(file))
         self.resizable(False, False)
         MainWin.center_in_scr(self, 500, 150)
         self.transient(parent)
         self.create_contents()
         self.protocol("WM_DELETE_WINDOW", self.stop)
+
+    def portion(self, num):
+        if not len(self.lines):
+            return None
+        data = []
+        num = num if num <= len(self.lines) else len(self.lines)
+        for _ in range(num):
+            data.append(self.lines.popleft())
+        return data
 
     def create_contents(self):
         self.lbl_progress = Label(self, font=self.parent.wryh12)
@@ -730,15 +743,19 @@ class ImportWin(Toplevel):
 
     class MyThread(threading.Thread):
         def __init__(self, outer, keyword, work_queue):
-            threading.Thread.__init__(self)
+            super().__init__()
             self.outer = outer
             self.keyword = keyword
             self.q = work_queue
-            self.name = "Thread-" + keyword
+            self.name = "Thread-" + keyword[0]
 
         def run(self):
+            if self.outer.to_stop:
+                return
             result = self.outer.parent.search_simple(self.keyword)
             if result:
+                if self.outer.to_stop:
+                    return
                 self.q.put(result)  # 放入一条数据, 元组(WORD, PHONETIC, MEANING, EG)
             else:
                 self.outer.failed_words.append(self.keyword)  # 存储搜索查询失败词条
@@ -749,22 +766,49 @@ class ImportWin(Toplevel):
         self.lbl_progress['text'] = "请稍候..."
 
         def search():  # 搜索并创建数据结果
-            for word in self.lines:
-                t = self.MyThread(self, word, self.q)
-                t.daemon = True
-                t.start()
+            def get_data(words):
+                print('starting get_data')
+                threads = []
+                for word in words:
+                    t = self.MyThread(self, word, self.q)
+                    t.daemon = True
+                    threads.append(t)
+                    t.start()
+                for t in threads:
+                    t.join()
+
+            while True:
+                # 按分块进行搜索
+                data = self.portion(75)
+                if not data:
+                    break
+                get_data(data)
 
         def save():  # 保存并显示队列中的结果数据
+            parent = self.parent
+            save_func = parent.dic.save_simple  # 避免多次引用查找属性
             while self.value + len(self.failed_words) != self.count and not self.to_stop:
-                data = self.q.get()  # 取出一条数据, 元组(WORD, PHONETIC, MEANING, EG)
+                print(self.q.qsize(), self.value + len(self.failed_words))
+                try:
+                    data = self.q.get(timeout=3)  # 取出一条数据, 元组(WORD, PHONETIC, MEANING, EG)
+                except queue.Empty:
+                    continue
                 self.value += 1
-                self.pgsbar["value"] = self.value
+                try:
+                    self.pgsbar["value"] = self.value
+                except _tkinter.TclError:  # 强制停止时因为相关属性丢失不同步的异常
+                    print('catch a _tkinter.TclError exception')
+                    break
                 self.lbl_progress["text"] = "正在导入: %d/%d  词条: %s" % (self.value, self.count, data[0])
-                self.repeats += self.parent.dic.save_simple(data)  # 统计因过去式等形式而重复保存单词的次数
-                self.parent.cobbx_item.delete(0, END)
-                self.parent.cobbx_item.insert(0, data[0])
-                self.parent.cobbx_item.update()
-                self.parent.explain_display(([data[0], 1], [data[1], 2], [data[2], 3], [data[3], 4]))
+                self.repeats += save_func(data)  # 统计因分词形式而重复保存单词的次数
+                parent.cobbx_item.delete(0, END)
+                parent.cobbx_item.insert(0, data[0])
+                parent.cobbx_item.update()
+                parent.explain_display(([data[0], 1], [data[1], 2], [data[2], 3], [data[3], 4]))
+                self.q.task_done()
+
+            if self.to_stop:
+                print('save stop!')
 
             if self.value + len(self.failed_words) == self.count:
                 print("完成!")
@@ -785,7 +829,7 @@ class ImportWin(Toplevel):
         if not completed:  # 存在导入失败的词条
             if messagebox.askokcancel("导入词条", "{0}个词条未成功导入\n{1}个单词被重复保存\n是否重新导入?".
                                       format(len(self.failed_words), self.repeats)):
-                self.lines = self.failed_words[:]  # (浅)拷贝列表
+                self.lines = deque(self.failed_words[:])  # (浅)拷贝列表
                 del self.failed_words[:]  # 清空导入失败的词条列表
                 self.start()
         else:
