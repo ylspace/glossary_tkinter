@@ -226,6 +226,9 @@ class MainWin(Frame):  # 继承自Frame类
 
         self.txt_explain['state'] = 'disabled'  # 插入文本后将其设置为只读
 
+    def create_dict_db(self):
+        self.dic = database.DataBase(self, self.tmp_db)  # 创建一个DataBase的实例对象, 可从临时数据库(当前为空)对象中保存数据
+
     @staticmethod
     def search(self, keyword=None, *arg):  # 搜索关键词的方法, 参数keyword用以从字典窗口中加载, arg用于获取保存状态
         self.dic.tmp_db = None  # 重置临时数据库对象
@@ -816,11 +819,11 @@ class ImportWin(Toplevel):
                 completed = not len(self.failed_words)  # 无导入失败词条
                 self.finish(completed)
 
-        thread_search = threading.Thread(target=search)
+        thread_search = threading.Thread(target=search, name='Thread-search')
         thread_search.daemon = True
         thread_search.start()
 
-        thread_save = threading.Thread(target=save)
+        thread_save = threading.Thread(target=save, name='Thread-save')
         thread_save.daemon = True
         thread_save.start()  # 不采用join()堵塞主线程, 易造成无响应
 

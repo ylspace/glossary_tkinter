@@ -2,7 +2,11 @@
   <dictionary name="Administrator">
     <words>
       <w>apilink</w>
+      <w>appd</w>
       <w>cobbx</w>
+      <w>cust</w>
+      <w>datalist</w>
+      <w>egsentns</w>
       <w>endline</w>
       <w>errno</w>
       <w>errstr</w>
@@ -19,6 +23,7 @@
       <w>textvariable</w>
       <w>toplevel</w>
       <w>treeview</w>
+      <w>wordlist</w>
       <w>xlsx</w>
       <w>xscrollcommand</w>
       <w>yscrollcommand</w>

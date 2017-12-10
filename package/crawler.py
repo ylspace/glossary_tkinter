@@ -40,11 +40,11 @@ class Crawler:
         }
 
         content = ""
-        proxy_list = proxy.get_proxy()
-        proxies = {}
-        if proxy_list:
-            proxies_tuple = random.choice(proxy_list)
-            proxies[proxies_tuple[0]] = proxies_tuple[1]
+        proxies_list = proxy.get_proxy()
+        proxies = None
+        if proxies_list:
+            proxies_tuple = random.choice(proxies_list)
+            proxies = {proxies_tuple[0]: proxies_tuple[1]}
         try:
             self.response = requests.get(self.url, params=post, headers=self.header, proxies=proxies, timeout=8)
             self.called_count += 1

@@ -7,6 +7,7 @@
 import re
 import os
 import datetime
+import sqlite3
 
 
 pattern_zh = "[\u4e00-\u9fa5]"  # 中文匹配模板
@@ -100,3 +101,30 @@ def is_valid_ipfile(file):
         is_ip_included = re.search(r"HTTP", ip_file.read())
 
     return is_ip_included and is_recent_modified
+
+
+def dbs_merge(main_db_file, appd_db_file):
+    """
+    将数据库appd_db_file合并到数据库main_db_file
+    :param main_db_file: 接受数据的数据库文件路径
+    :param appd_db_file: 附加数据的数据库文件路径
+    :return is_succeed: 是否成功进行合并
+    """
+    is_succeed = True
+    if not os.path.exists(main_db_file) or not os.path.exists(appd_db_file) or main_db_file == appd_db_file:
+        return False  # 若有无效数据库文件路径或两参数为同一个数据库文件
+    main_db_con = sqlite3.connect(main_db_file)
+    main_db_cur = main_db_con.cursor()
+    main_db_cur.execute('''ATTACH DATABASE {!r} AS append_db;'''.format(appd_db_file))
+    main_db_cur.execute("INSERT OR IGNORE INTO CUSTOM SELECT * FROM append_db.CUSTOM;")
+    count_affected = main_db_cur.rowcount  # 受到更改的行数
+    if not count_affected:  # 无更改, 表明附加数据库为空, 或与原数据库内容完全相同
+        is_succeed = False
+    else:
+        main_db_cur.execute("INSERT OR IGNORE INTO DICT SELECT * FROM append_db.DICT;")
+    main_db_con.commit()
+    main_db_cur.execute("DETACH DATABASE append_db;")
+    main_db_cur.close()
+    return is_succeed
+
+

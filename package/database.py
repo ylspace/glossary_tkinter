@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import sqlite3
-import os
 import ast
 import chardet
+from collections import OrderedDict
+from lxml import etree
+import os
+import sqlite3
 import subprocess
 import _tkinter
+from tkinter import messagebox, filedialog, END
 from xlwt import *
 from xlrd import *
-from collections import OrderedDict
-from tkinter import messagebox, filedialog, END
 from package import utils, application
 
 sys.setrecursionlimit(10000)  # 设置较大递归深度, 防止对象组合使用时, 调用方法出错
@@ -43,7 +44,8 @@ class TempDB:
 
 class MasterDB:  # 主数据库
     def __init__(self):
-        db_dict = sqlite3.connect('.\data\Dictionary.db')  # 建立并连接数据库文件,创建数据库链接对象
+        self.db_file = '.\data\Dictionary.db'
+        db_dict = sqlite3.connect(self.db_file)  # 建立并连接数据库文件,创建数据库链接对象
         cur_db = db_dict.cursor()  # 创建游标对象,用以执行数据库执行语句
         cur_db.execute('''CREATE TABLE IF NOT EXISTS DICT
                                        (WORD text PRIMARY KEY NOT NULL,
@@ -107,7 +109,7 @@ class DataBase(MasterDB):  # 数据库
         return is_saved
 
     def get_data(self, word):
-        db_dict = sqlite3.connect('.\data\Dictionary.db')  # 建立并连接数据库文件,创建数据库链接对象
+        db_dict = sqlite3.connect(self.db_file)  # 建立并连接数据库文件,创建数据库链接对象
         group = []
         word = utils.trans_to_normal(word)  # 获取框内的词条(为字符串),转为正常形式
         self.app.cobbx_item.delete(0, END)
@@ -153,7 +155,7 @@ class DataBase(MasterDB):  # 数据库
             if not self.tmp_db:  # 若因意外导致tmp_db不存在, 结束
                 print("self.tmp_db==None: ", self.tmp_db is None)
                 return
-            db_dict = sqlite3.connect('.\data\Dictionary.db')  # 建立并连接数据库文件,创建数据库链接对象
+            db_dict = sqlite3.connect(self.db_file)  # 建立并连接数据库文件,创建数据库链接对象
             items = self.tmp_db.get()  # 从临时数据库获取数据, 即当前保存/搜索的词条
             db_dict.execute("INSERT INTO DICT VALUES (?, ?, ?, ?)", (items[0], items[1], items[2], items[3]))
             db_dict.execute("INSERT INTO CUSTOM VALUES (?, ?, ?)", (items[0], '', ''))
@@ -180,7 +182,7 @@ class DataBase(MasterDB):  # 数据库
     # @staticmethod
     def save_simple(self, items):
         repeat_word = 0
-        db_dict = sqlite3.connect('.\data\Dictionary.db')
+        db_dict = sqlite3.connect(self.db_file)
         try:
             db_dict.execute("INSERT INTO DICT VALUES (?, ?, ?, ?)", (items[0], items[1], str(items[2]), str(items[3])))
         except sqlite3.IntegrityError:  # 分词形式搜索时被还原为原型, 导致重复保存
@@ -221,7 +223,7 @@ class DataBase(MasterDB):  # 数据库
             self.app.lbl_existinfo['text'] = "未保存的词条 {0}".format(entry)
             return
         if is_saved:  # 若已保存
-            db_dict = sqlite3.connect('.\data\Dictionary.db')  # 建立并连接数据库文件,创建数据库链接对象
+            db_dict = sqlite3.connect(self.db_file)  # 建立并连接数据库文件,创建数据库链接对象
             word = None
             for i in (entry, entry.lower(), entry.upper(), entry.capitalize()):  # 考虑大小写匹配问题
                 group_words = list(db_dict.execute("SELECT WORD, PHONETIC, MEANING, EG FROM DICT WHERE WORD=?", (i, )))
@@ -246,7 +248,7 @@ class DataBase(MasterDB):  # 数据库
     def empty(self):
         count = len(self.words_meanings_customs)
         if count and messagebox.askyesno("清除全部词条", "是否清除全部{0}个词条?".format(count)):
-            db_dict = sqlite3.connect('.\data\Dictionary.db')
+            db_dict = sqlite3.connect(self.db_file)
             db_dict.execute("DELETE FROM DICT")
             db_dict.execute("DELETE FROM CUSTOM")
             db_dict.commit()
@@ -275,7 +277,7 @@ class DataBase(MasterDB):  # 数据库
         items = utils.get_mean_items(ast.literal_eval(self.words_meanings_customs[word][1]))  # 慎用不安全的eval()
         self.app.create_custom_win(items, word)
         custom = self.app.win_Specify.custom
-        db_dict = sqlite3.connect('.\data\Dictionary.db')
+        db_dict = sqlite3.connect(self.db_file)
         # 删除词义指定
         if self.app.win_Specify.to_del_specify and db_dict.execute("SELECT WORD FROM CUSTOM WHERE WORD=?", (word,)):
             db_dict.execute("UPDATE CUSTOM set SPECIFY='' WHERE WORD=?", (word,))
@@ -309,7 +311,7 @@ class DataBase(MasterDB):  # 数据库
             self.app.cobbx_item.set(word)
         self.app.create_class_win(word)
         item = self.app.win_Classify.custom_class.get()
-        db_dict = sqlite3.connect('.\data\Dictionary.db')
+        db_dict = sqlite3.connect(self.db_file)
         # 删除分类
         if self.app.win_Classify.to_del_class and db_dict.execute("SELECT WORD FROM CUSTOM WHERE WORD=?", (word, )):
             db_dict.execute("UPDATE CUSTOM set CLASSIFY='' WHERE WORD=?", (word, ))
@@ -337,46 +339,73 @@ class DataBase(MasterDB):  # 数据库
     def impt(self):
         # print("导入: ", end=" ")
         f_import = filedialog.askopenfile(mode='rb', defaultextension=".txt", initialdir=os.getcwd() + '\data',
-                                          filetypes=[('数据库文件', '.db'), ('文本文档', '.txt'), ('Excel表格文档', '.xls')],
-                                          initialfile='Dictionary', title="导入字典文件")
+                                          filetypes=[('数据库文件', '.db'), ('文本文档', '.txt'), ('Excel表格文档', '.xls'),
+                                                     ('XML文档', '.xml')],
+                                          initialfile='dict', title="导入字典文件")
         if f_import:  # 确保文件打开成功
-            if os.path.splitext(f_import.name)[1] == '.txt':  # 导入的文本文件
-                encoding = chardet.detect(f_import.read())['encoding']
-                f_import.seek(0, 0)  # 重置指针位置
-                items = [line.decode(encoding).split("|", 1)[0]
-                         for line in f_import.readlines() if line]  # 忽略空行, 以"|"分隔
+            ext_name = os.path.splitext(f_import.name)[1]
+            if ext_name == '.txt' or ext_name == '.xls':  # 导入的文本文件或Excel表格文件
+                items = []
+                if ext_name == '.txt':
+                    encoding = chardet.detect(f_import.read())['encoding']
+                    f_import.seek(0, 0)  # 重置指针位置
+                    items = [line.decode(encoding).split("|", 1)[0]
+                             for line in f_import.readlines() if line]  # 忽略空行, 以"|"分隔
+                elif ext_name == '.xls':
+                    print("表格文件!")
+                    rb = open_workbook(f_import.name, encoding_override='utf-8')
+                    table = rb.sheet_by_name("Dictionary")
+                    for i in range(table.nrows):
+                        items.append(table.cell_value(i, 0))
                 items = [word for word in items if not DataBase.is_exist_simple(self, word)]  # 确保未保存
                 if len(items) > 0:
-                    if messagebox.askokcancel(title="导入词条", message="文件中共有{0}个未保存单词, 是否导入".format(len(items))):
+                    if messagebox.askokcancel(title="导入词条", message="文件中共有{0}个未保存单词, 是否导入"
+                                              .format(len(items))):
                         self.app.create_impt_win(items, os.path.basename(f_import.name))
                 else:
                     messagebox.showwarning(title="导入词条", message="该文件中不存在未保存单词!")
 
-            if os.path.splitext(f_import.name)[1] == '.xls':  # 导入的Excel表格文件
-                print("表格文件!")
-                rb = open_workbook(f_import.name, encoding_override='utf-8')
-                table = rb.sheet_by_name("Dictionary")
-                for i in range(table.nrows):
-                    print(table.cell_value(i, 0), table.cell_value(i, 1))
+            if ext_name == '.db':  # 导入的数据库文件
+                # 合并导入的数据库中的数据
+                is_succeed = utils.dbs_merge(os.path.abspath(self.db_file), os.path.abspath(f_import.name))
+                if is_succeed:  # 未成功执行合并时, 不进行属性的重设, 减少不必要开销
+                    super().__init__()  # 重新建立self.words_meanings_customs属性
 
-            if os.path.splitext(f_import.name)[1] == '.db':  # 导入的数据库文件
-                print("数据库文件!")
+            if ext_name == '.xml':  # 导入的是XML文档文件
+                db_con = sqlite3.connect(self.db_file)
+                db_cur = db_con.cursor()
+                xml_tree = etree.parse(f_import.name)  # 创建xml树的解析对象
+                count_affected = 0
+                for word in xml_tree.iterfind('word'):  # 迭代式地查找word节点
+                    db_cur.execute("INSERT OR IGNORE INTO DICT VALUES (?, ?, ?, ?);",
+                                   (word.get("show"), word.findtext('phonetic'),
+                                    word.findtext('meanings'), word.findtext('eg')))
+                    db_cur.execute("INSERT OR IGNORE INTO CUSTOM VALUES (?, ?, ?);",
+                                   (word.get("show"), word.findtext('specify'), word.findtext('classify')))
+                    count_affected = db_cur.rowcount  # 得到rows affected计数
+                    db_con.commit()
+                db_con.close()
+                if count_affected:  # 若产生了修改
+                    super().__init__()  # 重新建立self.words_meanings_customs属性
+
             f_import.close()
 
     def expt(self):
-        print("导出")
         # 另存为, 并返回打开的文件
         group = self.words_meanings_customs.values()
-        f_export = filedialog.asksaveasfile(mode='w', defaultextension=".txt", initialdir=os.getcwd() + '\data',
-                                            filetypes=[('文本文档', '.txt'), ('Excel表格文档', '.xls')],
-                                            initialfile='Dictionary', title="导出字典文件")
+        # print(group)
+        f_export = filedialog.asksaveasfile(mode='wb', defaultextension=".txt", initialdir=os.getcwd() + '\data',
+                                            filetypes=[('文本文档', '.txt'), ('Excel表格文档', '.xls'),
+                                                       ('sqlite数据库', '.db'), ('XML文档', '.xml')],
+                                            initialfile='dict', title="导出字典文件")
         if f_export:  # 确保文件打开成功
-            if os.path.splitext(f_export.name)[1] == '.txt':  # 导出为文本文件
+            ext_name = os.path.splitext(f_export.name)[1]
+            if ext_name == '.txt':  # 导出为文本文件
                 for item in group:
-                    f_export.write("{0}|{1}\n".format(item[0], item[1]))
+                    f_export.write("{0}|{1}\n".format(item[0], item[1]).encode('utf-8'))
                     # f_export.write("{0:-<15}{1}\n".format(item[0], item[1]))
 
-            if os.path.splitext(f_export.name)[1] == '.xls':  # 导出为Excel表格文件
+            if ext_name == '.xls':  # 导出为Excel表格文件
                 wb = Workbook(encoding='utf-8')
                 ws = wb.add_sheet("Dictionary")
                 for index, item in enumerate(group):
@@ -384,13 +413,43 @@ class DataBase(MasterDB):  # 数据库
                     # item[1]为字符串形式的列表, 通过misc简化得列表, 只能以字符串形式写入xls
                     ws.write(index, 1, str(utils.get_mean_items(ast.literal_eval(item[1]))))
                 wb.save(f_export.name)
+
+            if ext_name == '.db':  # 导出为数据库db文件(另存为副本)
+                with open(self.db_file, 'rb') as db_file:
+                    f_export.write(db_file.read())
+
+            if ext_name == '.xml':  # 导出为XML文件
+                db_con = sqlite3.connect(self.db_file)
+                datalist = list(db_con.execute("""SELECT DICT.WORD, DICT.PHONETIC, DICT.MEANING, DICT.EG,
+                                                         CUSTOM.SPECIFY, CUSTOM.CLASSIFY FROM DICT, CUSTOM
+                                                  WHERE DICT.WORD=CUSTOM.WORD"""))
+                db_con.close()
+                xml_root = etree.Element('wordlist')  # 创建xml节点元素
+                for item in datalist:
+                    node_word = etree.SubElement(xml_root, "word")
+                    node_word.set("show", item[0])
+                    node_phonetic = etree.SubElement(node_word, "phonetic")
+                    node_phonetic.text = item[1]
+                    node_meanings = etree.SubElement(node_word, "meanings")
+                    node_meanings.text = item[2]
+                    node_egsentns = etree.SubElement(node_word, "eg")
+                    node_egsentns.text = item[3]
+                    node_specify = etree.SubElement(node_word, "specify")
+                    node_specify.text = item[4]
+                    node_classify = etree.SubElement(node_word, "classify")
+                    node_classify.text = item[5]
+                xml_tree = etree.ElementTree(xml_root)  # 创建xml树
+                xml_tree.write(f_export.name, pretty_print=True, xml_declaration=True, encoding='utf-8')
+
             f_export.close()
 
-    # 清理数据库文件空闲空间
     def vacuum(self):
+        """
+        清理数据库文件空闲空间
+        """
         msg = "删除词条后, 数据库文件中存在空闲空间, 可释放该磁盘空间, 但可能会降低一定的效率, 是否继续?"
         if messagebox.askyesno("清空数据库", message=msg):
-            db_dict = sqlite3.connect('.\data\Dictionary.db')
+            db_dict = sqlite3.connect(self.db_file)
             db_dict.execute("VACUUM;")
             db_dict.commit()
             db_dict.close()

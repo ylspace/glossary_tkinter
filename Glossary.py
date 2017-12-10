@@ -62,7 +62,7 @@ my_crawler = startup(sv)
 
 app = application.MainWin.create_main_win(my_crawler)  # 创建一个窗口对象, 并传入爬虫对象
 app.update_network_status("检测中...")
-app.dic = database.DataBase(app, app.tmp_db)  # 创建一个DataBase的实例对象, 从临时数据库(当前为空)对象中保存数据
+app.create_dict_db()
 
 check = StringVar()  # entry变化即检测存在信息
 check.trace('w', lambda name, index, mode, chk=check: database.DataBase.is_exist(app.dic, chk.get()))
@@ -77,8 +77,11 @@ def network_check(obj):
         "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36"
              }
     while True:
-        proxy_item = random.choice(proxy.get_proxy())
-        proxies = {proxy_item[0]: proxy_item[1]}
+        proxies_list = proxy.get_proxy()
+        proxies = None
+        if proxies_list:
+            proxy_item = random.choice(proxies_list)
+            proxies = {proxy_item[0]: proxy_item[1]}
         time.sleep(1)
         try:
             requests.get("http://cn.bing.com/dict/search/", headers=header, proxies=proxies)
@@ -124,4 +127,4 @@ thread_count.start()
 translate.root_title(app)
 app.root.mainloop()
 
-
+print('运行结束')
