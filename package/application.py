@@ -40,7 +40,7 @@ class MainWin(Frame):  # 继承自Frame类
         self.wryh10 = font.Font(family="微软雅黑", size=10)
         self.wryh12 = font.Font(family="微软雅黑", size=12)
         self.wryh16 = font.Font(family="微软雅黑", size=16)
-        self.dic = None  # 字典对象, 在Glossar.py的main方法中进行对象创建
+        self.dic = None  # 字典对象, 在Glossary.py的main方法中进行对象创建
         self.tmp_db = None  # 临时数据库对象
         self.last_entry = ''  # 上一次搜索的词条
         self.last_time_items = deque(maxlen=7)  # 创建一个固定长度的双端队列,存储之前搜索过的几个词条
@@ -142,9 +142,15 @@ class MainWin(Frame):  # 继承自Frame类
         self.lbl_check = Label(self.entryFrame, text='查询: ', font=self.wryh12)
         self.lbl_check.grid(row=0, column=0)
 
+        def reset(entry):
+            self.cobbx_item.delete(0, END)
+            self.cobbx_item.insert(0, entry)
+            self.cobbx_item.update()
+
         self.cobbx_item = Combobox(self.entryFrame, background='snow', font=self.wryh12)
         self.cobbx_item.bind('<Return>', self.keyevent_entry)  # 事件绑定, 按下回车键触发search方法
         self.cobbx_item.grid(row=0, column=1)
+        self.cobbx_item.reset = reset
 
         # 寄存于EntryFrame组件中
         self.btn_search = Button(self.entryFrame, text='确认', command=lambda arg=self: MainWin.search(arg))
@@ -234,14 +240,10 @@ class MainWin(Frame):  # 继承自Frame类
         self.dic.tmp_db = None  # 重置临时数据库对象
         if keyword:
             entry = keyword
-            self.cobbx_item.delete(0, END)
-            self.cobbx_item.insert(0, entry)
-            self.cobbx_item.update()
+            self.cobbx_item.reset(entry)
         else:
             entry = utils.trans_to_normal(self.cobbx_item.get())  # 获取框内的词条(为字符串), 剔除非法字符
-            self.cobbx_item.delete(0, END)
-            self.cobbx_item.insert(0, entry)
-            self.cobbx_item.update()
+            self.cobbx_item.reset(entry)
         is_saved = arg[0] if arg else database.DataBase.is_exist(self.dic, entry)  # arg不为空时传入的is_saved均为False
         go_search = entry != self.last_entry if is_saved else True  # 决定是否进行搜索, 若未保存则一定需要搜索
         if 0 < len(entry) <= 64 and go_search:  # 检查是否为空,以及是否未改变,以及是否未保存
@@ -261,8 +263,7 @@ class MainWin(Frame):  # 继承自Frame类
 
                     if entry != word:
                         entry = word
-                        self.cobbx_item.delete(0, END)
-                        self.cobbx_item.insert(0, word)
+                        self.cobbx_item.reset(word)
                     self.last_entry = entry
 
                     if entry not in self.last_time_items:
@@ -283,9 +284,7 @@ class MainWin(Frame):  # 继承自Frame类
                 word = is_saved
                 if entry != word:
                     entry = word
-                    self.cobbx_item.delete(0, END)
-                    self.cobbx_item.insert(0, entry)
-                    self.cobbx_item.update()
+                    self.cobbx_item.reset(entry)
                 self.explain_display(self.dic.get_data(word))
 
                 if self.win_Dict_exist:  # win_Dict须存在
@@ -756,7 +755,7 @@ class ImportWin(Toplevel):
             if self.outer.to_stop:
                 return
             result = self.outer.parent.search_simple(self.keyword)
-            if result:
+            if result and result[0]:
                 if self.outer.to_stop:
                     return
                 self.q.put(result)  # 放入一条数据, 元组(WORD, PHONETIC, MEANING, EG)
@@ -783,7 +782,7 @@ class ImportWin(Toplevel):
             while True:
                 # 按分块进行搜索
                 data = self.portion(75)
-                if not data:
+                if not data or self.to_stop:
                     break
                 get_data(data)
 
@@ -801,17 +800,20 @@ class ImportWin(Toplevel):
                     self.pgsbar["value"] = self.value
                 except _tkinter.TclError:  # 强制停止时因为相关属性丢失不同步的异常
                     print('catch a _tkinter.TclError exception')
-                    break
-                self.lbl_progress["text"] = "正在导入: %d/%d  词条: %s" % (self.value, self.count, data[0])
+                try:
+                    self.lbl_progress["text"] = "正在导入: %d/%d  词条: %s" % (self.value, self.count, data[0])
+                except _tkinter.TclError:
+                    pass
                 self.repeats += save_func(data)  # 统计因分词形式而重复保存单词的次数
-                parent.cobbx_item.delete(0, END)
-                parent.cobbx_item.insert(0, data[0])
-                parent.cobbx_item.update()
-                parent.explain_display(([data[0], 1], [data[1], 2], [data[2], 3], [data[3], 4]))
+                try:
+                    self.parent.cobbx_item.reset(data[0])
+                except _tkinter.TclError:
+                    pass
+                try:
+                    parent.explain_display(([data[0], 1], [data[1], 2], [data[2], 3], [data[3], 4]))
+                except _tkinter.TclError:
+                    pass
                 self.q.task_done()
-
-            if self.to_stop:
-                print('save stop!')
 
             if self.value + len(self.failed_words) == self.count:
                 print("完成!")

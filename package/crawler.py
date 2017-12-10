@@ -66,10 +66,12 @@ class Crawler:
             content = self.response.text
             if not content:
                 print('成功获取到空页面')
-            # if re.search("<div>No results found for ", content) and not pass_connect_error:
+            if re.search('<div class="dym_p">', content):
+                content = ""
             if re.search("<div>No results found for ", content):
                 content = ""
-                print('检查网络代理')
-                # messagebox.showerror(title="网络错误!", message="请检查网络代理设置!")
+                if not pass_connect_error:
+                    print('检查网络代理')
+                    # messagebox.showerror(title="网络错误!", message="请检查网络代理设置!")
         finally:
             return content

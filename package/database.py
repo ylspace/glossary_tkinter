@@ -349,8 +349,11 @@ class DataBase(MasterDB):  # 数据库
                 if ext_name == '.txt':
                     encoding = chardet.detect(f_import.read())['encoding']
                     f_import.seek(0, 0)  # 重置指针位置
-                    items = [line.decode(encoding).split("|", 1)[0]
-                             for line in f_import.readlines() if line]  # 忽略空行, 以"|"分隔
+                    for line in f_import.readlines():
+                        if line:  # 忽略空行
+                            words = line.decode(encoding).split("|", 1)[0]  # 以"|"分隔
+                            words = words.split(',')  # 考虑多个以逗号分隔的单词
+                            items.extend(words)
                 elif ext_name == '.xls':
                     print("表格文件!")
                     rb = open_workbook(f_import.name, encoding_override='utf-8')
